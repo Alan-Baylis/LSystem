@@ -22,7 +22,7 @@ public class LSystem : MonoBehaviour {
     public float y_axis_rot_degree;
     public uint iterations;
     public List<Primitive> primitives;
-    public char initial;
+    public string initial;
     public List<ProductionRule> production_rules;
 
     //used for faster lookups
@@ -37,6 +37,8 @@ public class LSystem : MonoBehaviour {
     private const char rot_y_neg = '/';
 
     private System.Random rng;
+
+    private string tree_string;
 
     private string rewrite(string initial) {
         string output;
@@ -84,6 +86,9 @@ public class LSystem : MonoBehaviour {
         return output;
     }
 
+    void parseTreeString(string tree_string) {
+    }
+
     private float calculateXRot(string rot) {
         return 0;
     }
@@ -94,10 +99,34 @@ public class LSystem : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
+        rng = new System.Random();
+        primitive_map = new Dictionary<char, Primitive>();
+        production_map = new Dictionary<char, List<ProductionRule>>();
+
+        foreach(Primitive prim in primitives) {
+            primitive_map[prim.name] = prim;
+        }
+
+        foreach(ProductionRule prod_rule in production_rules) {
+            if(production_map.ContainsKey(prod_rule.initial)) {
+                production_map[prod_rule.initial].Add(prod_rule);
+            }
+            else {
+                List<ProductionRule> rule_list = new List<ProductionRule>();
+                rule_list.Add(prod_rule);
+                production_map[prod_rule.initial] = rule_list;
+            }
+        }
+
+        tree_string = initial;
+        for(int i = 0; i < iterations; ++i) {
+            tree_string = rewrite(tree_string);
+            Debug.Log(tree_string);
+        }
 	}
-	
-	// Update is called once per frame
-	void Update () {
-	
+
+    // Update is called once per frame
+    void Update() {
+        
 	}
 }
