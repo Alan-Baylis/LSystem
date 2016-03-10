@@ -9,6 +9,7 @@ using System.Globalization;
 public class Primitive {
     public char name;
     public GameObject prefab;
+    public bool ignore_scale;
 };
 
 [System.Serializable]
@@ -64,7 +65,7 @@ public class LSystem : MonoBehaviour {
                     rand_val *= total_prob;
 
                     int p = 0;
-                    while(rand_val < prob[p] && p < prob.Length - 1) {
+                    while(rand_val > prob[p] && p < prob.Length - 1) {
                         p++;
                     }
 
@@ -193,13 +194,21 @@ public class LSystem : MonoBehaviour {
                 }
 
                 GameObject branch_segment = Instantiate(primitive_map[branch_string[i]].prefab);
+                bool ignore_scale = primitive_map[branch_string[i]].ignore_scale;
                 Mesh bs_mesh = branch_segment.GetComponent<MeshFilter>().mesh;
                 Bounds mesh_bounds = bs_mesh.bounds;
 
                 float y_offset_add = (mesh_bounds.max.y - mesh_bounds.min.y) * branch_segment.transform.localScale.y;
                 float mesh_offset = mesh_bounds.min.y * branch_segment.transform.localScale.y;
 
-                branch_segment.transform.parent = parent.transform;
+                if(ignore_scale) {
+                    GameObject scale_ignore = new GameObject();
+                    branch_segment.transform.parent = scale_ignore.transform;
+                    scale_ignore.transform.parent = parent.transform;
+                }
+                else {
+                    branch_segment.transform.parent = parent.transform;
+                }
                 branch_segment.transform.localPosition = new Vector3(0, y_offset - mesh_offset, 0);
 
                 last_segment_mesh = bs_mesh;
