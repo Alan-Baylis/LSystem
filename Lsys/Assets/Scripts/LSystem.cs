@@ -49,9 +49,11 @@ public class LSystem : MonoBehaviour {
         for(int i = 0; i < initial.Length; ++i) {
             if(production_map.ContainsKey(initial[i])) {
                 List<ProductionRule> key_prod_rules = production_map[initial[i]];
+                //does not exist in production rules, so remains as is
                 if(key_prod_rules.Count == 0) {
                     builder.Append(initial[i]);
                 }
+                //substitutes the replacement string in the relevant production rules with the current character
                 else {
                     float total_prob = 0f;
                     float[] prob = new float[key_prod_rules.Count];
@@ -61,6 +63,7 @@ public class LSystem : MonoBehaviour {
                         prob[j] = total_prob;
                     }
 
+                    //for stochastic l-systems, computes total "probability" and generates a random number which specifies which rule to use
                     float rand_val = (float)rng.NextDouble();
                     rand_val *= total_prob;
 
@@ -88,6 +91,7 @@ public class LSystem : MonoBehaviour {
         return output;
     }
 
+    //gets the floating value indicating scale, and strips it from the string
     private float getBranchScale(ref string branch_string) {
         Regex r = new Regex(@"^[0-9]*(\.[0-9]*)?");
         MatchCollection mc = r.Matches(branch_string);
@@ -103,6 +107,7 @@ public class LSystem : MonoBehaviour {
         return scale;
     }
 
+    //sums the rotation symbols in the string, and strips them
     private string getRotationCounters(string branch_string, ref int x_counter, ref int y_counter){
         int k = 0;
         bool rot_complete = false;
@@ -129,7 +134,6 @@ public class LSystem : MonoBehaviour {
             }
         }
 
-        //strips rotation info
         return branch_string.Substring(k);
     }
 
@@ -198,10 +202,12 @@ public class LSystem : MonoBehaviour {
                 Mesh bs_mesh = branch_segment.GetComponent<MeshFilter>().mesh;
                 Bounds mesh_bounds = bs_mesh.bounds;
 
+                //calculates offset so we know where to add the next segment
                 float y_offset_add = (mesh_bounds.max.y - mesh_bounds.min.y) * branch_segment.transform.localScale.y;
                 float mesh_offset = mesh_bounds.min.y * branch_segment.transform.localScale.y;
 
                 if(ignore_scale) {
+                    //level of indirection to ignore scale
                     GameObject scale_ignore = new GameObject();
                     branch_segment.transform.parent = scale_ignore.transform;
                     scale_ignore.transform.parent = parent.transform;
