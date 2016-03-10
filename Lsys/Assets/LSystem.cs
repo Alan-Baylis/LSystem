@@ -87,7 +87,52 @@ public class LSystem : MonoBehaviour {
         return output;
     }
 
-    void parseTreeString(string branch_string, GameObject parent) {
+    private float getBranchScale(ref string branch_string) {
+        Regex r = new Regex(@"^[0-9]*(\.[0-9]*)?");
+        MatchCollection mc = r.Matches(branch_string);
+
+        if(mc.Count == 0) {
+            throw new System.Exception("Unable to find scale factor for branch [" + branch_string +
+                "], please ensure that you specify a floating number immediately after the [ character to indicate scale");
+        }
+
+        float scale = float.Parse(mc[0].Value, CultureInfo.InvariantCulture.NumberFormat);
+        branch_string = branch_string.Substring(mc[0].Value.Length);
+
+        return scale;
+    }
+
+    private string getRotationCounters(string branch_string, ref int x_counter, ref int y_counter){
+        int k = 0;
+        bool rot_complete = false;
+        while(k < branch_string.Length && !rot_complete) {
+            switch(branch_string[k]) {
+                case ROT_X_POS: 
+                    x_counter++;
+                    break;
+                case ROT_X_NEG: 
+                    x_counter--;
+                    break;
+                case ROT_Y_POS: 
+                    y_counter++;
+                    break;
+                case ROT_Y_NEG: 
+                    y_counter--;
+                    break;
+                default: rot_complete = true;
+                    break;
+            }
+
+            if(!rot_complete) {
+                k++;
+            }
+        }
+
+        //strips rotation info
+        return branch_string.Substring(k);
+    }
+
+    private void parseTreeString(string branch_string, GameObject parent) {
         float y_offset = 0;
         Mesh last_segment_mesh = null;
 
@@ -98,85 +143,48 @@ public class LSystem : MonoBehaviour {
                 int openings = 1;
                 int j = i + 1;
 
+                //finds branch end
                 for(; j < branch_string.Length; ++j) {
-                    if(branch_string[i] == BRANCH_START) {
+                    if(branch_string[j] == BRANCH_START) {
                         openings++;
                     }
-                    else if(branch_string[i] == BRANCH_END) {
+                    else if(branch_string[j] == BRANCH_END) {
                         openings--;
                     }
-
+   
                     if(openings == 0) {
                         break;
                     }
+                    
                 }
 
                 if(j == branch_string.Length) {
                     throw new System.Exception("Parsing error, unable to find end of branch, check for missing ]");
                 }
 
+                //strips square brackets
                 int length = j - i;
-                string branch_substring = branch_string.Substring(i + 1, length - 2);
-                Regex r = new Regex(@"^[0-9]*(?:\.[0-9]*)?$");
-                MatchCollection mc = r.Matches(branch_substring);
+                string branch_substring = branch_string.Substring(i + 1, length - 1);
+                
+                float scale = getBranchScale(ref branch_substring);
 
-                if(mc.Count == 0) {
-                    throw new System.Exception("Unable to find scale factor for branch [" + branch_substring + 
-                        "], please ensure that you specify a floating number immediately after the [ character to indicate scale");
-                }
-
-                float scale = float.Parse(mc[0].Value, CultureInfo.InvariantCulture.NumberFormat);
-
-                int k = 0;
-                bool rot_complete = false;
                 int x_rot_count = 0;
                 int y_rot_count = 0;
 
-                while(k < branch_substring.Length && !rot_complete) {
-                    switch(branch_substring[k]) {
-                        case ROT_X_POS: 
-                            x_rot_count++;
-                            break;
-                        case ROT_X_NEG: 
-                            x_rot_count--;
-                            break;
-                        case ROT_Y_POS: 
-                            y_rot_count++;
-                            break;
-                        case ROT_Y_NEG: 
-                            y_rot_count--;
-                            break;
-                        default: rot_complete = true;
-                            break;
-                    }
-
-                    if(!rot_complete) {
-                        k++;
-                    }
-                }
-
-                string bs_no_scale_rot = branch_substring.Substring(k);
+                branch_substring = getRotationCounters(branch_substring, ref x_rot_count, ref y_rot_count);
 
                 float x_rot = x_axis_rot_degree * (float)x_rot_count;
                 float y_rot = y_axis_rot_degree * (float)y_rot_count;
-                x_rot = x_rot / 180f * Mathf.PI;
-                y_rot = y_rot / 180f * Mathf.PI;
-
-                Quaternion x_quat = new Quaternion();
-                x_quat.SetAxisAngle(new Vector3(1, 0, 0), x_rot);
-
-                Quaternion y_quat = new Quaternion();
-                y_quat.SetAxisAngle(new Vector3(0, 1, 0), y_rot);
-
-                Quaternion final_quat = y_quat * x_quat;
 
                 GameObject branch_parent = new GameObject();
+                parseTreeString(branch_substring, branch_parent);
+
                 branch_parent.transform.parent = parent.transform;
-                branch_parent.transform.rotation = final_quat;
+                branch_parent.transform.Rotate(new Vector3(x_rot, y_rot, 0));
+                branch_parent.transform.localScale = new Vector3(scale, scale, scale);
+                branch_parent.transform.localPosition = new Vector3(0, y_offset, 0);
 
-                parseTreeString(bs_no_scale_rot, branch_parent);
-
-                i = j + 1;
+                i = j + 1;  
             }
             //create desired branch segment
             else {
@@ -185,14 +193,14 @@ public class LSystem : MonoBehaviour {
                 }
 
                 GameObject branch_segment = Instantiate(primitive_map[branch_string[i]].prefab);
-                Mesh bs_mesh = branch_segment.GetComponent<Mesh>();
+                Mesh bs_mesh = branch_segment.GetComponent<MeshFilter>().mesh;
                 Bounds mesh_bounds = bs_mesh.bounds;
 
                 float y_offset_add = (mesh_bounds.max.y - mesh_bounds.min.y) * branch_segment.transform.localScale.y;
                 float mesh_offset = mesh_bounds.min.y * branch_segment.transform.localScale.y;
 
-                branch_segment.transform.localPosition = new Vector3(0, y_offset + mesh_offset, 0);
                 branch_segment.transform.parent = parent.transform;
+                branch_segment.transform.localPosition = new Vector3(0, y_offset - mesh_offset, 0);
 
                 last_segment_mesh = bs_mesh;
 
@@ -233,6 +241,8 @@ public class LSystem : MonoBehaviour {
             tree_string = rewrite(tree_string);
             Debug.Log(tree_string);
         }
+
+        parseTreeString(tree_string, gameObject);
 	}
 
     // Update is called once per frame
